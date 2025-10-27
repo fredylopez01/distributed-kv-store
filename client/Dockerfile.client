@@ -11,8 +11,5 @@ RUN npm install
 # Copy client code
 COPY client.js .
 
-# Install required packages
-RUN npm install axios readline
-
 # Command to run the client
 CMD ["node", "client.js"]

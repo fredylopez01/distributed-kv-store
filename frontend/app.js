@@ -1,18 +1,8 @@
-// Detect if we're running inside Docker or externally
-// Si accedemos desde localhost, usar localhost con puertos (para desarrollo local)
-// Si accedemos desde IP externa, usar IPs externas (para otros dispositivos)
-const isLocalhost = window.location.hostname === 'localhost' || 
-                   window.location.hostname === '127.0.0.1';
-
-// Para linealizabilidad, todas las operaciones deben ir al líder (dinámico ahora)
-const NODES = isLocalhost ? [
-    { id: 'node1', url: 'http://localhost:3000', port: 3000, isLeader: false },
-    { id: 'node2', url: 'http://localhost:3001', port: 3001, isLeader: false },
-    { id: 'node3', url: 'http://localhost:3002', port: 3002, isLeader: false }
-] : [
-    { id: 'node1', url: 'http://192.168.20.150:3000', port: 3000, isLeader: false },
-    { id: 'node2', url: 'http://192.168.20.150:3001', port: 3001, isLeader: false },
-    { id: 'node3', url: 'http://192.168.20.150:3002', port: 3002, isLeader: false }
+// Configuración de nodos - usar proxy a través del frontend
+const NODES = [
+    { id: 'node1', url: 'http://localhost:8080/api/node1', port: 3000, isLeader: false },
+    { id: 'node2', url: 'http://localhost:8080/api/node2', port: 3001, isLeader: false },
+    { id: 'node3', url: 'http://localhost:8080/api/node3', port: 3002, isLeader: false }
 ];
 
 let operations = [];
@@ -22,7 +12,6 @@ let raftStates = {};
 // Initialize the application
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Hostname:', window.location.hostname);
-    console.log('isLocalhost:', isLocalhost);
     console.log('NODES:', NODES);
     initializeNodes();
     refreshOperations();
@@ -81,25 +70,37 @@ function initializeNodes() {
 
 async function checkNodeStatus(node) {
     try {
-        console.log(`Verificando nodo: ${node.id} en ${node.url}`);
+        console.log(`[FRONTEND] Verificando nodo: ${node.id} en ${node.url}`);
         const response = await axios.get(`${node.url}/operations`, { timeout: 5000 });
-        console.log(`Respuesta de ${node.id}:`, response.data);
-        updateNodeStatus(node.id, true, response.data.operations.length);
+        console.log(`[FRONTEND] ✅ Respuesta de ${node.id}:`, response.data);
+        // response.data es un array directamente
+        const operationCount = Array.isArray(response.data) ? response.data.length : 0;
+        updateNodeStatus(node.id, true, operationCount);
     } catch (error) {
-        console.error(`Error verificando ${node.id}:`, error.message);
+        console.error(`[FRONTEND] ❌ Error verificando ${node.id}:`, error.message);
+        console.error(`[FRONTEND] Error completo:`, error);
         updateNodeStatus(node.id, false, 0);
     }
 }
 
 async function refreshRaftStates() {
+    console.log('[FRONTEND] 🔄 Actualizando estados Raft...');
     for (const node of NODES) {
         try {
+            console.log(`[FRONTEND] Verificando estado Raft de ${node.id} en ${node.url}`);
             const response = await axios.get(`${node.url}/raft-state`, { timeout: 3000 });
+            console.log(`[FRONTEND] ✅ Estado Raft de ${node.id}:`, response.data);
             updateRaftState(node.id, response.data);
+            // Mark node as online when we get a response
+            nodeStatuses[node.id] = true;
         } catch (error) {
-            console.error(`Error obteniendo estado Raft de ${node.id}:`, error.message);
+            console.error(`[FRONTEND] ❌ Error obteniendo estado Raft de ${node.id}:`, error.message);
+            // Mark node as offline if we can't reach it
+            nodeStatuses[node.id] = false;
         }
     }
+    // Update system status after all nodes have been checked
+    updateSystemStatus();
 }
 
 function updateRaftState(nodeId, state) {
@@ -208,8 +209,9 @@ async function refreshOperations() {
         const promises = NODES.map(async (node) => {
             try {
                 const response = await axios.get(`${node.url}/operations`, { timeout: 3000 });
-                return response.data;
+                return { nodeId: node.id, operations: response.data };
             } catch (error) {
+                console.error(`Error obteniendo operaciones de ${node.id}:`, error.message);
                 return null;
             }
         });
@@ -217,10 +219,13 @@ async function refreshOperations() {
         const results = await Promise.all(promises);
         const allOperations = results
             .filter(result => result && result.operations)
-            .flatMap(result => result.operations);
+            .flatMap(result => 
+                result.operations.map(op => ({ ...op, nodeId: result.nodeId }))
+            );
         
         // Sort by timestamp
         operations = allOperations.sort((a, b) => a.timestamp - b.timestamp);
+        console.log('Operaciones cargadas:', operations.length);
         updateTimeline();
         updateOperationCount();
     } catch (error) {
@@ -230,6 +235,11 @@ async function refreshOperations() {
 
 function updateTimeline() {
     const timeline = document.getElementById('operationsTimeline');
+    if (!timeline) {
+        console.error('[FRONTEND] ❌ Elemento operationsTimeline no encontrado');
+        return;
+    }
+    
     timeline.innerHTML = '';
     
     if (operations.length === 0) {
@@ -300,32 +310,43 @@ async function putValue() {
 
 async function getValue() {
     const key = document.getElementById('getKey').value.trim();
+    const selectedNodeId = document.getElementById('getNode').value;
     
     if (!key) {
         showNotification('Por favor ingrese una clave', 'error');
         return;
     }
     
-    // Encontrar al líder dinámicamente
-    const leader = NODES.find(node => node.isLeader);
-    if (!leader) {
-        showNotification('No hay líder disponible. Esperando elección...', 'warning');
-        return;
+    // Si se selecciona un nodo específico, usarlo; si no, usar el líder
+    let targetNode;
+    if (selectedNodeId) {
+        targetNode = NODES.find(node => node.id === selectedNodeId);
+        if (!targetNode) {
+            showNotification('Nodo no encontrado', 'error');
+            return;
+        }
+    } else {
+        targetNode = NODES.find(node => node.isLeader);
+        if (!targetNode) {
+            showNotification('No hay líder disponible. Esperando elección...', 'warning');
+            return;
+        }
     }
     
     try {
-        const response = await axios.get(`${leader.url}/${key}`);
+        const response = await axios.get(`${targetNode.url}/${key}`);
         if (response.data.value) {
-            showNotification(`GET ${key} = ${response.data.value} (via ${leader.id} - LÍDER)`, 'success');
-            animateNode(leader.id, 'get');
+            const nodeType = targetNode.isLeader ? 'LÍDER' : 'SEGUIDOR';
+            showNotification(`GET ${key} = ${response.data.value} (via ${targetNode.id} - ${nodeType})`, 'success');
+            animateNode(targetNode.id, 'get');
             document.getElementById('getKey').value = '';
         } else if (response.data.error) {
-            showNotification(`Clave "${key}" no encontrada`, 'warning');
+            showNotification(`Clave "${key}" no encontrada en ${targetNode.id}`, 'warning');
         } else {
-            showNotification(`Clave "${key}" no encontrada`, 'warning');
+            showNotification(`Clave "${key}" no encontrada en ${targetNode.id}`, 'warning');
         }
     } catch (error) {
-        showNotification(`Error en ${leader.id}: ${error.message}`, 'error');
+        showNotification(`Error en ${targetNode.id}: ${error.message}`, 'error');
     }
 }
 
@@ -340,14 +361,70 @@ async function forceElection(nodeId) {
     }
 }
 
+// Track partition state
+let partitionedNodes = new Set();
+
 async function simulatePartition(nodeId) {
     try {
+        console.log(`[FRONTEND] Simulando partición en ${nodeId}`);
         const node = NODES.find(n => n.id === nodeId);
-        await axios.post(`${node.url}/simulate-partition`, { partitioned: true });
-        showNotification(`🔌 Partición simulada en ${nodeId}`, 'warning');
+        if (!node) {
+            showNotification(`Nodo ${nodeId} no encontrado`, 'error');
+            return;
+        }
+        
+        const isCurrentlyPartitioned = partitionedNodes.has(nodeId);
+        console.log(`[FRONTEND] Estado actual de ${nodeId}: ${isCurrentlyPartitioned ? 'particionado' : 'conectado'}`);
+        
+        // Toggle partition state
+        if (isCurrentlyPartitioned) {
+            // Remove partition
+            console.log(`[FRONTEND] Restaurando ${nodeId}...`);
+            await axios.post(`${node.url}/simulate-partition`, { partitioned: false });
+            partitionedNodes.delete(nodeId);
+            showNotification(`✅ Nodo ${nodeId} restaurado al cluster`, 'success');
+        } else {
+            // Add partition
+            console.log(`[FRONTEND] Aislando ${nodeId}...`);
+            await axios.post(`${node.url}/simulate-partition`, { partitioned: true });
+            partitionedNodes.add(nodeId);
+            showNotification(`🔌 Nodo ${nodeId} aislado del cluster (partición simulada)`, 'warning');
+        }
+        
+        console.log(`[FRONTEND] Partición simulada exitosamente en ${nodeId}`);
+        console.log(`[FRONTEND] Nodos particionados:`, Array.from(partitionedNodes));
+        
+        // Update button text and style
+        updatePartitionButton(nodeId, !isCurrentlyPartitioned);
+        
         setTimeout(refreshRaftStates, 1000);
     } catch (error) {
+        console.error(`[FRONTEND] Error simulando partición en ${nodeId}:`, error);
         showNotification(`Error simulando partición en ${nodeId}: ${error.message}`, 'error');
+    }
+}
+
+function updatePartitionButton(nodeId, isPartitioned) {
+    console.log(`[FRONTEND] Actualizando botón de ${nodeId}, particionado: ${isPartitioned}`);
+    // Find the button for this node
+    const nodeIndex = NODES.findIndex(n => n.id === nodeId);
+    const nodeCard = document.querySelector(`#nodesContainer > div:nth-child(${nodeIndex + 1})`);
+    if (nodeCard) {
+        const button = nodeCard.querySelector('button[onclick*="simulatePartition"]');
+        if (button) {
+            if (isPartitioned) {
+                button.textContent = '🔌 Restaurar Nodo';
+                button.className = 'w-full bg-red-500 text-white px-3 py-1 rounded text-xs hover:bg-red-600 transition-colors';
+            } else {
+                button.textContent = '🔌 Simular Partición';
+                button.className = 'w-full bg-orange-500 text-white px-3 py-1 rounded text-xs hover:bg-orange-600 transition-colors';
+            }
+            console.log(`[FRONTEND] Botón actualizado para ${nodeId}`);
+        } else {
+            console.error(`[FRONTEND] Botón de partición no encontrado para ${nodeId}`);
+        }
+    } else {
+        console.error(`[FRONTEND] Tarjeta de nodo no encontrada para ${nodeId}`);
     }
 }
 
