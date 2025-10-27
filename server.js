@@ -325,6 +325,14 @@ app.put('/:key', async (req, res) => {
     const { key } = req.params;
     const { value } = req.body;
     
+    // Check if node is partitioned
+    if (raftNode.isPartitioned) {
+        console.log(`[${nodeId}] 🔌 Rechazando PUT - Nodo particionado`);
+        return res.status(503).json({ 
+            error: `Nodo ${nodeId} está particionado y no puede procesar operaciones` 
+        });
+    }
+    
     try {
         const result = await raftNode.put(key, value);
         res.json(result);
@@ -423,6 +431,14 @@ app.post('/simulate-partition', (req, res) => {
 // GET endpoint (generic KV store - must be last)
 app.get('/:key', async (req, res) => {
     const { key } = req.params;
+    
+    // Check if node is partitioned
+    if (raftNode.isPartitioned) {
+        console.log(`[${nodeId}] 🔌 Rechazando GET - Nodo particionado`);
+        return res.status(503).json({ 
+            error: `Nodo ${nodeId} está particionado y no puede procesar operaciones` 
+        });
+    }
     
     try {
         const result = await raftNode.get(key);
