@@ -1,0 +1,18 @@
+FROM node:16-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm install
+
+# Copy client code
+COPY client.js .
+
+# Install required packages
+RUN npm install axios readline
+
+# Command to run the client
+CMD ["node", "client.js"]

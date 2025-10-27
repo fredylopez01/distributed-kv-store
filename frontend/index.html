@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema Distribuido KV Store - Demostración de Linealizabilidad</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        @keyframes pulse-green {
+            0%, 100% { background-color: rgb(34 197 94); }
+            50% { background-color: rgb(74 222 128); }
+        }
+        @keyframes pulse-blue {
+            0%, 100% { background-color: rgb(59 130 246); }
+            50% { background-color: rgb(147 197 253); }
+        }
+        .pulse-green { animation: pulse-green 1s ease-in-out; }
+        .pulse-blue { animation: pulse-blue 1s ease-in-out; }
+        .node-card { transition: all 0.3s ease; }
+        .node-card:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .operation-item { animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">Sistema Distribuido KV Store</h1>
+            <p class="text-gray-600">Demostración de Linealizabilidad en Sistemas Distribuidos</p>
+        </header>
+
+        <!-- Main Content -->
+        <main class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Control Panel -->
+            <section class="lg:col-span-1">
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h2 class="text-2xl font-semibold mb-4 text-gray-800">Panel de Control</h2>
+                    
+                    <!-- PUT Operation -->
+                    <div class="mb-6">
+                        <h3 class="text-lg font-medium mb-2 text-gray-700">Almacenar Valor (PUT)</h3>
+                        <div class="space-y-2">
+                            <input type="text" id="putKey" placeholder="Clave" 
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <input type="text" id="putValue" placeholder="Valor" 
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <button onclick="putValue()" 
+                                class="w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 transition duration-200">
+                                PUT
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- GET Operation -->
+                    <div class="mb-6">
+                        <h3 class="text-lg font-medium mb-2 text-gray-700">Obtener Valor (GET)</h3>
+                        <div class="space-y-2">
+                            <input type="text" id="getKey" placeholder="Clave" 
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+                            <button onclick="getValue()" 
+                                class="w-full bg-green-500 text-white py-2 px-4 rounded-md hover:bg-green-600 transition duration-200">
+                                GET
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="space-y-2">
+                        <button onclick="refreshOperations()" 
+                            class="w-full bg-purple-500 text-white py-2 px-4 rounded-md hover:bg-purple-600 transition duration-200">
+                            Actualizar Operaciones
+                        </button>
+                        <button onclick="clearOperations()" 
+                            class="w-full bg-red-500 text-white py-2 px-4 rounded-md hover:bg-red-600 transition duration-200">
+                            Limpiar Operaciones
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Status -->
+                <div class="bg-white rounded-lg shadow-lg p-6 mt-6">
+                    <h3 class="text-lg font-medium mb-2 text-gray-700">Estado del Sistema</h3>
+                    <div id="systemStatus" class="text-sm text-gray-600">
+                        <p>Nodos activos: <span id="activeNodes" class="font-semibold">0/3</span></p>
+                        <p>Operaciones totales: <span id="totalOps" class="font-semibold">0</span></p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Nodes Visualization -->
+            <section class="lg:col-span-2">
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h2 class="text-2xl font-semibold mb-4 text-gray-800">Nodos del Sistema</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="nodesContainer">
+                        <!-- Nodes will be dynamically added here -->
+                    </div>
+                </div>
+
+                <!-- Operations Timeline -->
+                <div class="bg-white rounded-lg shadow-lg p-6 mt-6">
+                    <h2 class="text-2xl font-semibold mb-4 text-gray-800">Línea de Tiempo de Operaciones</h2>
+                    <div id="operationsTimeline" class="space-y-2 max-h-96 overflow-y-auto">
+                        <!-- Operations will be dynamically added here -->
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Info Section -->
+        <section class="mt-8 bg-blue-50 rounded-lg p-6">
+            <h3 class="text-lg font-semibold mb-2 text-blue-900">¿Qué es la Linealizabilidad?</h3>
+            <p class="text-blue-800 text-sm">
+                La linealizabilidad es un modelo de consistencia en sistemas distribuidos que garantiza que las operaciones 
+                parecen ocurrir instantáneamente en algún punto entre su invocación y respuesta. En este demo, cada 
+                operación tiene un timestamp único y todos los nodos eventualmente acuerdan el mismo orden de operaciones.
+            </p>
+        </section>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
