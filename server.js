@@ -334,19 +334,6 @@ app.put('/:key', async (req, res) => {
     }
 });
 
-// GET endpoint
-app.get('/:key', async (req, res) => {
-    const { key } = req.params;
-    
-    try {
-        const result = await raftNode.get(key);
-        res.json(result || { error: 'Key not found' });
-    } catch (error) {
-        console.error(`[${nodeId}] Error GET: ${error.message}`);
-        res.status(500).json({ error: error.message });
-    }
-});
-
 // Raft endpoints
 app.post('/vote', async (req, res) => {
     try {
@@ -370,32 +357,31 @@ app.post('/heartbeat', async (req, res) => {
     }
 });
 
-// Replication endpoint
 app.post('/replicate', async (req, res) => {
     try {
-        await raftNode.receiveReplication(req.body);
+        const operation = req.body;
+        await raftNode.receiveReplication(operation);
         res.json({ success: true });
     } catch (error) {
-        console.error(`[${nodeId}] Error replicación: ${error.message}`);
+        console.error(`[${nodeId}] Error replicate: ${error.message}`);
         res.status(500).json({ error: error.message });
     }
 });
 
-// Get all operations (for visualization)
 app.get('/operations', (req, res) => {
+    res.json(raftNode.operations);
+});
+
+app.get('/status', (req, res) => {
     res.json({
-        nodeId,
-        isLeader: raftNode.state === 'leader',
-        operations: raftNode.getOperations()
+        nodeId: raftNode.nodeId,
+        state: raftNode.state,
+        term: raftNode.currentTerm,
+        leaderUrl: raftNode.leaderUrl,
+        isReady: raftNode.isReady
     });
 });
 
-// Status endpoint
-app.get('/status', (req, res) => {
-    res.json(raftNode.getStatus());
-});
-
-// Advanced endpoints for debugging
 app.get('/raft-state', (req, res) => {
     res.json({
         nodeId: raftNode.nodeId,
@@ -416,16 +402,37 @@ app.post('/force-election', async (req, res) => {
         raftNode.becomeCandidate();
         res.json({ success: true, message: 'Election started' });
     } catch (error) {
+        console.error(`[${nodeId}] Error force election: ${error.message}`);
         res.status(500).json({ error: error.message });
     }
 });
 
-// Simulate network partition
+// Simulate partition endpoint (for testing)
 app.post('/simulate-partition', (req, res) => {
-    const { partitioned } = req.body;
-    raftNode.isPartitioned = partitioned;
-    res.json({ success: true, partitioned });
+    try {
+        const { partitioned } = req.body;
+        raftNode.isPartitioned = partitioned;
+        console.log(`[${nodeId}] 🔌 Partition simulation: ${partitioned ? 'ENABLED' : 'DISABLED'}`);
+        res.json({ success: true, partitioned });
+    } catch (error) {
+        console.error(`[${nodeId}] Error simulate partition: ${error.message}`);
+        res.status(500).json({ error: error.message });
+    }
 });
+
+// GET endpoint (generic KV store - must be last)
+app.get('/:key', async (req, res) => {
+    const { key } = req.params;
+    
+    try {
+        const result = await raftNode.get(key);
+        res.json(result || { error: 'Key not found' });
+    } catch (error) {
+        console.error(`[${nodeId}] Error GET: ${error.message}`);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 
 app.listen(port, () => {
     console.log(`Raft KV Store ${nodeId} running on port ${port}`);

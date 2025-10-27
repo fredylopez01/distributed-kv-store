@@ -173,23 +173,34 @@ function updateSystemStatus() {
     const totalNodes = NODES.length;
     const leader = NODES.find(node => node.isLeader);
     
-    document.getElementById('systemStatus').innerHTML = `
-        <div class="flex items-center justify-between">
-            <span class="text-lg font-semibold">Estado del Sistema</span>
-            <span class="text-sm ${onlineNodes === totalNodes ? 'text-green-600' : 'text-orange-600'}">
-                ${onlineNodes}/${totalNodes} nodos activos
-            </span>
-        </div>
-        ${leader ? `
-            <div class="text-sm text-gray-600 mt-1">
-                Líder actual: <span class="font-semibold text-yellow-600">${leader.id} 👑</span>
-            </div>
-        ` : `
-            <div class="text-sm text-red-600 mt-1">
-                ⚠️ Sin líder detectado
-            </div>
-        `}
-    `;
+    // Update the active nodes count
+    const activeNodesElement = document.getElementById('activeNodes');
+    if (activeNodesElement) {
+        activeNodesElement.textContent = `${onlineNodes}/${totalNodes}`;
+        activeNodesElement.className = `font-semibold ${onlineNodes === totalNodes ? 'text-green-600' : 'text-orange-600'}`;
+    }
+    
+    // Update the total operations count
+    const totalOpsElement = document.getElementById('totalOps');
+    if (totalOpsElement) {
+        totalOpsElement.textContent = operations.length;
+    }
+    
+    // Add leader info if exists
+    const systemStatusDiv = document.getElementById('systemStatus');
+    if (systemStatusDiv && leader) {
+        // Remove existing leader info if any
+        const existingLeaderInfo = systemStatusDiv.querySelector('.leader-info');
+        if (existingLeaderInfo) {
+            existingLeaderInfo.remove();
+        }
+        
+        // Add leader info
+        const leaderInfo = document.createElement('p');
+        leaderInfo.className = 'leader-info text-sm text-gray-600';
+        leaderInfo.innerHTML = `Líder actual: <span class="font-semibold text-yellow-600">${leader.id} 👑</span>`;
+        systemStatusDiv.appendChild(leaderInfo);
+    }
 }
 
 async function refreshOperations() {
@@ -218,12 +229,17 @@ async function refreshOperations() {
 }
 
 function updateTimeline() {
-    const timeline = document.getElementById('timeline');
+    const timeline = document.getElementById('operationsTimeline');
     timeline.innerHTML = '';
     
-    operations.slice(-10).forEach(op => {
+    if (operations.length === 0) {
+        timeline.innerHTML = '<p class="text-gray-500 text-center">No hay operaciones registradas</p>';
+        return;
+    }
+    
+    operations.slice(-10).reverse().forEach(op => {
         const item = document.createElement('div');
-        item.className = 'bg-white rounded p-3 border-l-4 border-blue-500 shadow-sm';
+        item.className = 'bg-white rounded p-3 border-l-4 border-blue-500 shadow-sm operation-item';
         item.innerHTML = `
             <div class="flex justify-between items-start">
                 <div>
@@ -244,7 +260,14 @@ function updateTimeline() {
 }
 
 function updateOperationCount() {
-    document.getElementById('operationCount').textContent = operations.length;
+    document.getElementById('totalOps').textContent = operations.length;
+}
+
+function clearOperations() {
+    operations = [];
+    updateTimeline();
+    updateOperationCount();
+    showNotification('Operaciones limpiadas', 'info');
 }
 
 async function putValue() {
