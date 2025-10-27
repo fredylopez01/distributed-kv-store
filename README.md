@@ -283,7 +283,7 @@ POST usuario_789_post = "Hola mundo"
 | **Leader Election** | ✅ Dinámico | ✅ | ✅ | ✅ |
 | **Log Replication** | ✅ | ✅ | ✅ | ✅ |
 | **REST API** | ✅ | ✅ | ✅ | ✅ |
-| **Web UI** | ✅ Educativa | ❌ | ✅ | ✅ |
+| **Web UI** | ✅  | ❌ | ✅ | ✅ |
 | **Partition Testing** | ✅ | ❌ | ❌ | ❌ |
 
 ---
@@ -321,46 +321,12 @@ docker stop distributed-kv-store-node1-1
 # Verificar consistencia final
 ```
 
----
-
-## 📝 Contribuciones y Mejoras Futuras
-
-### **🚀 Roadmap de Nivel Industrial**
-- [ ] **Persistence**: Write-ahead log en disco
-- [ ] **Snapshotting**: Compresión de log para grandes datasets
-- [ ] **Cluster Scaling**: Soporte para N nodos dinámicos
-- [ ] **Security**: TLS y autenticación entre nodos
-- [ ] **Metrics**: Prometheus integration
-- [ ] **Tracing**: Jaeger/OpenTelemetry
-- [ ] **Load Balancing**: Distribución de lecturas
-- [ ] **Multi-datacenter**: Replicación geográfica
-
 ### **🤝 Cómo Contribuir**
 1. Fork el repositorio
 2. Crear feature branch: `git checkout -b raft-enhancement`
 3. Implementar mejora con tests
 4. Submit PR con descripción técnica
 
----
-
-## 🏆 Logros Técnicos
-
-### **🎯 ¿Por qué este proyecto es impresionante?**
-
-1. **📚 Implementación Completa de Raft**: No es un mock - es el algoritmo real
-2. **🔧 Production-Ready APIs**: Endpoints que podrías usar en producción
-3. **🎨 Visualización Única**: Ningún otro proyecto muestra Raft así
-4. **🧪 Testing Avanzado**: Simulación de fallos y particiones
-5. **📚 Valor Educativo**: Enseña conceptos que cuestan años dominar
-
-### **💡 Lo que aprenderás:**
-- **Consensus Algorithms**: Cómo funcionan etcd y Consul
-- **Distributed Systems**: Patrones de sistemas reales
-- **Fault Tolerance**: Cómo sobreviven los sistemas a fallos
-- **Network Protocols**: Comunicación entre nodos
-- **State Management**: Manejo de estado distribuido
-
----
 
 ## 🧹 Limpieza y Mantenimiento
 
@@ -396,17 +362,4 @@ docker system prune -af
 
 MIT License - Uso libre para fines educativos y de investigación.
 
----
 
-## 🎓 Reconocimientos
-
-Este proyecto implementa conceptos de:
-- **"In Search of an Understandable Consensus Algorithm"** - Ongaro & Ousterhout
-- **"Designing Data-Intensive Applications"** - Martin Kleppmann
-- **"Distributed Systems"** - Tanenbaum & Van Steen
-
----
-
-**🚀 Este es un sistema de nivel industrial que demuestra conceptos avanzados de distributed systems. No es un proyecto básico - es una implementación completa de consenso distribuido.**
-
-**🎓 Perfecto para estudiantes que quieren entender cómo funcionan REALMENTE sistemas como Kubernetes, etcd, y Consul.**
